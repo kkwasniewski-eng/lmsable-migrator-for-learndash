@@ -153,7 +153,7 @@ class LMFL_Admin_Page {
 		$kind      = sanitize_key( wp_unslash( $_POST['lmfl_download'] ) );
 		$course_id = isset( $_POST['course_id'] ) ? absint( wp_unslash( $_POST['course_id'] ) ) : 0;
 
-		if ( ! in_array( $kind, array( 'toc', 'report' ), true ) ) {
+		if ( ! in_array( $kind, array( 'toc', 'report', 'content', 'package' ), true ) ) {
 			wp_die( esc_html__( 'Unknown export type.', 'lmsable-migrator-for-learndash' ), '', array( 'response' => 400 ) );
 		}
 		if ( ! self::can_export( $course_id ) ) {
@@ -290,12 +290,17 @@ class LMFL_Admin_Page {
 				echo '<tr><td colspan="5"><strong>' . esc_html( $module['title'] ) . '</strong></td></tr>';
 				foreach ( $module['lessons'] as $item ) {
 					$length = isset( $item['content'] ) ? ( function_exists( 'mb_strlen' ) ? mb_strlen( $item['content'], 'UTF-8' ) : strlen( $item['content'] ) ) : 0;
+					$notes  = $item['_notes'];
+					if ( isset( $item['_quiz_stats'] ) ) {
+						/* translators: 1: exported questions, 2: skipped questions. */
+						array_unshift( $notes, sprintf( __( 'Questions exported: %1$d, skipped: %2$d', 'lmsable-migrator-for-learndash' ), $item['_quiz_stats']['exported'], $item['_quiz_stats']['skipped'] ) );
+					}
 					echo '<tr>';
 					echo '<td>&nbsp;&nbsp;&nbsp;' . esc_html( $item['title'] ) . '</td>';
 					echo '<td>' . esc_html( $item['type'] ) . '</td>';
 					echo '<td>' . esc_html( $item['time'] ) . '</td>';
 					echo '<td>' . esc_html( number_format_i18n( $length ) ) . '</td>';
-					echo '<td>' . esc_html( implode( '; ', $item['_notes'] ) ) . '</td>';
+					echo '<td>' . esc_html( implode( '; ', $notes ) ) . '</td>';
 					echo '</tr>';
 				}
 			}
@@ -308,7 +313,12 @@ class LMFL_Admin_Page {
 			wp_nonce_field( 'lmfl_download', 'lmfl_download_nonce' );
 			echo '<input type="hidden" name="course_id" value="' . esc_attr( (string) absint( $course_id ) ) . '" />';
 			echo '<button type="submit" class="button button-primary" name="lmfl_download" value="toc">' . esc_html__( 'Download TOC JSON', 'lmsable-migrator-for-learndash' ) . '</button> ';
-			echo '<button type="submit" class="button" name="lmfl_download" value="report">' . esc_html__( 'Download migration report', 'lmsable-migrator-for-learndash' ) . '</button>';
+			echo '<button type="submit" class="button" name="lmfl_download" value="report">' . esc_html__( 'Download migration report', 'lmsable-migrator-for-learndash' ) . '</button> ';
+			if ( class_exists( 'ZipArchive' ) ) {
+				echo '<button type="submit" class="button" name="lmfl_download" value="package">' . esc_html__( 'Download content package (.zip)', 'lmsable-migrator-for-learndash' ) . '</button>';
+			} else {
+				echo '<button type="submit" class="button" name="lmfl_download" value="content">' . esc_html__( 'Download content JSON', 'lmsable-migrator-for-learndash' ) . '</button>';
+			}
 			echo '</form>';
 
 			echo '<p><label for="lmfl-toc-json"><strong>' . esc_html__( 'TOC JSON', 'lmsable-migrator-for-learndash' ) . '</strong></label></p>';

@@ -1,6 +1,6 @@
 <?php
 /**
- * Builds the TOC JSON and the migration report; serves downloads.
+ * Builds the TOC JSON, the migration report and the content package; serves downloads.
  *
  * @package LMSable_Migrator_For_LearnDash
  */
@@ -26,6 +26,24 @@ class LMFL_Exporter {
 	public function build( $course_id ) {
 		$mapper = new LMFL_Course_Mapper();
 		$map    = $mapper->map( $course_id );
+
+		// Quiz questions for the content package; skipped questions go to the item notes.
+		$package = new LMFL_Content_Package();
+		foreach ( $map['modules'] as $m => $module ) {
+			foreach ( $module['lessons'] as $l => $item ) {
+				if ( 'quiz' !== $item['type'] && 'test' !== $item['type'] ) {
+					continue;
+				}
+				$quiz = $package->export_quiz( get_post( $item['_post_id'] ), $item['type'] );
+
+				$map['modules'][ $m ]['lessons'][ $l ]['_quiz']       = $quiz['quiz'];
+				$map['modules'][ $m ]['lessons'][ $l ]['_quiz_stats'] = array(
+					'exported' => $quiz['exported'],
+					'skipped'  => $quiz['skipped'],
+				);
+				$map['modules'][ $m ]['lessons'][ $l ]['_notes']      = array_values( array_unique( array_merge( $item['_notes'], $quiz['notes'] ) ) );
+			}
+		}
 
 		$toc    = array( 'modules' => array() );
 		$manual = array();
@@ -92,23 +110,73 @@ class LMFL_Exporter {
 	}
 
 	/**
+	 * Download body, file name and content type.
+	 *
+	 * @param array  $data Build data.
+	 * @param string $kind toc|report|content|package.
+	 * @return array{body:string,filename:string,type:string}|null Null when the file cannot be built.
+	 */
+	public function export_file( array $data, $kind ) {
+		if ( 'report' === $kind ) {
+			return array(
+				'body'     => $data['report'],
+				'filename' => $data['slug'] . '-report.md',
+				'type'     => 'text/markdown; charset=utf-8',
+			);
+		}
+		if ( 'content' !== $kind && 'package' !== $kind ) {
+			return array(
+				'body'     => $data['json'],
+				'filename' => $data['slug'] . '-toc.json',
+				'type'     => 'application/json; charset=utf-8',
+			);
+		}
+
+		$package = new LMFL_Content_Package();
+		$content = wp_json_encode( $package->build( $data ), self::JSON_FLAGS );
+		if ( false === $content ) {
+			return null;
+		}
+		if ( 'content' === $kind || ! class_exists( 'ZipArchive' ) ) {
+			return array(
+				'body'     => $content,
+				'filename' => $data['slug'] . '-content.json',
+				'type'     => 'application/json; charset=utf-8',
+			);
+		}
+
+		$zip = $package->zip(
+			array(
+				$data['slug'] . '-toc.json'     => $data['json'],
+				$data['slug'] . '-content.json' => $content,
+				$data['slug'] . '-report.md'    => $data['report'],
+				'INSTRUCTIONS.md'               => $package->instructions( $data ),
+			)
+		);
+		if ( false === $zip ) {
+			return null;
+		}
+		return array(
+			'body'     => $zip,
+			'filename' => $data['slug'] . '-lmsable-package.zip',
+			'type'     => 'application/zip',
+		);
+	}
+
+	/**
 	 * Sends a download and exits.
 	 *
 	 * @param int    $course_id Course id.
-	 * @param string $kind      toc|report.
+	 * @param string $kind      toc|report|content|package.
 	 */
 	public function send_download( $course_id, $kind ) {
-		$data = $this->build( $course_id );
-
-		if ( 'report' === $kind ) {
-			$body     = $data['report'];
-			$filename = $data['slug'] . '-report.md';
-			$type     = 'text/markdown; charset=utf-8';
-		} else {
-			$body     = $data['json'];
-			$filename = $data['slug'] . '-toc.json';
-			$type     = 'application/json; charset=utf-8';
+		$file = $this->export_file( $this->build( $course_id ), $kind );
+		if ( null === $file ) {
+			wp_die( esc_html__( 'Could not create the export file.', 'lmsable-migrator-for-learndash' ), '', array( 'response' => 500 ) );
 		}
+		$body     = $file['body'];
+		$filename = $file['filename'];
+		$type     = $file['type'];
 
 		// Drop anything other code may have buffered (stray output would corrupt the file).
 		while ( ob_get_level() > 0 ) {
@@ -187,7 +255,9 @@ class LMFL_Exporter {
 		/* translators: %d: count. */
 		$lines[] = '- ' . sprintf( __( 'Final tests: %d', 'lmsable-migrator-for-learndash' ), $stats['test'] );
 		$lines[] = '';
-		$lines[] = __( 'Quiz questions are not exported in this version – recreate them in LMSable.', 'lmsable-migrator-for-learndash' );
+		$lines[] = ( $stats['quiz'] + $stats['test'] ) > 0
+			? __( 'Single and multiple choice quiz questions are exported in the content package; skipped questions are listed below.', 'lmsable-migrator-for-learndash' )
+			: __( 'Quiz questions are not exported in this version – recreate them in LMSable.', 'lmsable-migrator-for-learndash' );
 
 		if ( $data['errors'] ) {
 			$lines[] = '';

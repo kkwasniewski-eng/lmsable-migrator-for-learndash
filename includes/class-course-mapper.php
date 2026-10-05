@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * LearnDash course -> modules/lessons structure.
  *
- * Lesson items carry internal keys prefixed with "_" (post id, notes, video URL);
+ * Lesson items carry internal keys prefixed with "_" (post id, notes, video URL, package HTML);
  * the exporter strips them before building the TOC JSON.
  */
 class LMFL_Course_Mapper {
@@ -247,11 +247,17 @@ class LMFL_Course_Mapper {
 		$notes   = array();
 		$title   = $this->clean_title( $post->post_title, $notes );
 		$content = '';
+		$html    = array(
+			'html'  => '',
+			'notes' => array(),
+		);
 
 		if ( 'lesson' === $type ) {
 			$processed = $this->pipeline->process( $post );
 			$content   = $processed['content'];
 			$notes     = array_merge( $notes, $processed['notes'] );
+			// Content package HTML (same pipeline pass, cached).
+			$html = $this->pipeline->process_html( $post );
 
 			$video = $this->get_video( $post );
 			if ( $video['enabled'] ) {
@@ -294,9 +300,11 @@ class LMFL_Course_Mapper {
 			$item['content'] = $content;
 		}
 
-		$item['_post_id']   = $post->ID;
-		$item['_video_url'] = isset( $video['url'] ) ? $video['url'] : '';
-		$item['_notes']     = array_values( array_unique( $notes ) );
+		$item['_post_id']    = $post->ID;
+		$item['_video_url']  = isset( $video['url'] ) ? $video['url'] : '';
+		$item['_notes']      = array_values( array_unique( $notes ) );
+		$item['_html']       = $html['html'];
+		$item['_html_notes'] = $html['notes'];
 
 		return $item;
 	}

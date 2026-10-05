@@ -4,7 +4,7 @@ Tags: learndash, lms, export, migration, course
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,7 +21,7 @@ LMSable Migrator for LearnDash adds an "Export to LMSable" screen to the LearnDa
 
 Everything is generated locally. The plugin sends no data anywhere, stores nothing in the database and requires no account.
 
-Quiz questions and Elementor content are not exported in this version.
+A content package (.zip with lesson HTML, video links, single/multiple choice quiz questions and INSTRUCTIONS.md) can be used with Claude and the LMSable connector to fill the lessons. Other quiz question types are listed in the report.
 
 == Installation ==
 
@@ -30,6 +30,12 @@ Quiz questions and Elementor content are not exported in this version.
 3. Go to LearnDash LMS > Export to LMSable.
 
 == Changelog ==
+
+= 0.2.0 =
+* Content package: lesson HTML (LMSable tag whitelist), video URLs and notes per lesson, downloadable as a .zip with INSTRUCTIONS.md for Claude + LMSable MCP (or as JSON without ZipArchive).
+* Quiz export: single and multiple choice ProQuiz questions in the LMSable quiz format; other types are skipped and reported.
+* Elementor: text, headings, icon lists, toggles and accordions are now exported; other widgets are reported.
+* Preview shows exported/skipped question counts per quiz.
 
 = 0.1.0 =
 * First release: TOC JSON export, migration report, course row action.
