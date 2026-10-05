@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       LMSable Migrator for LearnDash
  * Description:       Exports a LearnDash course as an LMSable TOC JSON and a migration report. Everything is generated locally; nothing is sent anywhere.
- * Version:           0.2.0
+ * Version:           0.3.0
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            eTechnologie
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'LMFL_VERSION', '0.2.0' );
+define( 'LMFL_VERSION', '0.3.0' );
 define( 'LMFL_DIR', plugin_dir_path( __FILE__ ) );
 
 require_once LMFL_DIR . 'includes/class-content-pipeline.php';

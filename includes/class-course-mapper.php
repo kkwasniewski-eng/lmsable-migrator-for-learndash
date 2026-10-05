@@ -266,7 +266,7 @@ class LMFL_Course_Mapper {
 					$notes[] = __( 'Video enabled but no URL set – add the video manually', 'lmsable-migrator-for-learndash' );
 				} elseif ( $video['portable'] ) {
 					/* translators: %s: video URL. */
-					$notes[] = sprintf( __( 'Video: %s (YouTube/Vimeo/Loom – portable, paste the link in LMSable)', 'lmsable-migrator-for-learndash' ), $video['url'] );
+					$notes[] = sprintf( __( 'Video: %s (YouTube/Vimeo/Loom – imported automatically with the TOC)', 'lmsable-migrator-for-learndash' ), $video['url'] );
 				} else {
 					/* translators: %s: video URL. */
 					$notes[] = sprintf( __( 'Video: %s (self-hosted or other host – upload the video manually)', 'lmsable-migrator-for-learndash' ), $video['url'] );
@@ -298,6 +298,12 @@ class LMFL_Course_Mapper {
 		}
 		if ( '' !== $content ) {
 			$item['content'] = $content;
+		}
+		/* TOC import of LMSable 2026-10+ reads this field and attaches the video
+		   to the lesson; older versions must never see it (import would fail),
+		   hence the plugin release is gated on the app deploy. */
+		if ( 'video' === $type && ! empty( $video['portable'] ) && '' !== $video['url'] ) {
+			$item['video'] = $video['url'];
 		}
 
 		$item['_post_id']    = $post->ID;
@@ -434,7 +440,9 @@ class LMFL_Course_Mapper {
 		}
 
 		$host = strtolower( (string) wp_parse_url( $video['url'], PHP_URL_HOST ) );
-		foreach ( array( 'youtube.com', 'youtu.be', 'youtube-nocookie.com', 'vimeo.com', 'loom.com' ) as $portable ) {
+		/* The same host whitelist that the LMSable TOC import and video lesson accept
+		   (youtube-nocookie.com is NOT accepted there, so it counts as manual). */
+		foreach ( array( 'youtube.com', 'youtu.be', 'vimeo.com', 'loom.com' ) as $portable ) {
 			if ( $host === $portable || substr( $host, -strlen( '.' . $portable ) ) === '.' . $portable ) {
 				$video['portable'] = true;
 				break;

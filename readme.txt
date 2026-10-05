@@ -4,7 +4,7 @@ Tags: learndash, migration, export, scorm, course
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.2.0
+Stable tag: 0.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -67,6 +67,9 @@ Only to import the course on lmsable.com. The free plan is enough for courses up
 
 == Changelog ==
 
+= 0.3.0 =
+* Video lessons: YouTube/Vimeo/Loom links are now carried inside the TOC JSON and attached automatically on import (needs LMSable from October 2026 or newer). Self-hosted and other hosts stay in the migration report.
+
 = 0.2.0 =
 * Content package: lesson HTML (LMSable tag whitelist), video URLs and notes per lesson, downloadable as a .zip with INSTRUCTIONS.md for Claude + LMSable MCP (or as JSON without ZipArchive).
 * Quiz export: single and multiple choice ProQuiz questions in the LMSable quiz format; other types are skipped and reported.
@@ -77,6 +80,9 @@ Only to import the course on lmsable.com. The free plan is enough for courses up
 * First release: TOC JSON export, migration report, course row action.
 
 == Upgrade Notice ==
+
+= 0.3.0 =
+Video links now import automatically with the TOC JSON.
 
 = 0.2.0 =
 Adds the content package (lesson HTML + quiz questions) and Elementor support. Exports from 0.1.0 stay valid.
