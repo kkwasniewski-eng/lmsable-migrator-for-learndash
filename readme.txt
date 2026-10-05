@@ -63,9 +63,7 @@ Only to import the course on lmsable.com. The free plan is enough for courses up
 
 == Screenshots ==
 
-1. Export screen: course preview with modules, lessons, types and notes.
-2. Download buttons: TOC JSON, migration report and content package.
-3. Migration report listing items that need manual work.
+1. Export screen: course preview with modules, lessons, types and notes, download buttons and the manual-migration list.
 
 == Changelog ==
 
