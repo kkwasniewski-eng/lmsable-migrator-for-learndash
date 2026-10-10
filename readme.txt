@@ -4,7 +4,7 @@ Tags: learndash, migration, export, scorm, course
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,9 @@ Only to import the course on lmsable.com. The free plan is enough for courses up
 1. Export screen: course preview with modules, lessons, types and notes, download buttons and the manual-migration list.
 
 == Changelog ==
+
+= 0.4.0 =
+* New export mode: course source material (markdown) for AI rebuild in LMSable; export screen mode picker with size counter and automatic part splitting.
 
 = 0.3.0 =
 * Video lessons: YouTube/Vimeo/Loom links are now carried inside the TOC JSON and attached automatically on import (needs LMSable from October 2026 or newer). Self-hosted and other hosts stay in the migration report.

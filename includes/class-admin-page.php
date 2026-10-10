@@ -125,7 +125,7 @@ class LMFL_Admin_Page {
 	}
 
 	/**
-	 * Inline "Copy to clipboard" script on our screen only.
+	 * Inline "Copy to clipboard" and export mode switch scripts on our screen only.
 	 *
 	 * @param string $hook_suffix Current screen hook.
 	 */
@@ -138,6 +138,10 @@ class LMFL_Admin_Page {
 		wp_add_inline_script(
 			'lmfl-admin',
 			"document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#lmfl-copy');if(!b){return;}e.preventDefault();var t=document.getElementById('lmfl-toc-json'),s=document.getElementById('lmfl-copy-status');if(!t){return;}var done=function(){if(s){s.textContent=b.getAttribute('data-copied');}};var fallback=function(){t.focus();t.select();try{document.execCommand('copy');done();}catch(x){}};if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t.value).then(done,fallback);}else{fallback();}});"
+		);
+		wp_add_inline_script(
+			'lmfl-admin',
+			"document.addEventListener('change',function(e){var r=e.target;if(!r||'lmfl_mode'!==r.name){return;}['toc','source'].forEach(function(m){var el=document.getElementById('lmfl-mode-'+m);if(el){el.hidden=(m!==r.value);}});});"
 		);
 	}
 
@@ -153,7 +157,7 @@ class LMFL_Admin_Page {
 		$kind      = sanitize_key( wp_unslash( $_POST['lmfl_download'] ) );
 		$course_id = isset( $_POST['course_id'] ) ? absint( wp_unslash( $_POST['course_id'] ) ) : 0;
 
-		if ( ! in_array( $kind, array( 'toc', 'report', 'content', 'package' ), true ) ) {
+		if ( ! in_array( $kind, array( 'toc', 'report', 'content', 'package', 'source' ), true ) ) {
 			wp_die( esc_html__( 'Unknown export type.', 'lmsable-migrator-for-learndash' ), '', array( 'response' => 400 ) );
 		}
 		if ( ! self::can_export( $course_id ) ) {
@@ -308,10 +312,59 @@ class LMFL_Admin_Page {
 		}
 
 		if ( '' !== $data['json'] && $data['modules'] ) {
+			$source       = new LMFL_Source_Export();
+			$source_len   = $source->length( $source->markdown( $data ) );
+			$source_parts = count( $source->parts( $data ) );
+			// Video-heavy courses keep their structure; text courses gain from an AI rebuild.
+			$mode = $stats['video'] > $source->count_text_lessons( $data ) ? 'toc' : 'source';
+
+			$modes = array(
+				'toc'    => array(
+					'title' => __( 'Faithful structure (TOC import)', 'lmsable-migrator-for-learndash' ),
+					'desc'  => __( 'Maps modules and lessons 1:1, video lessons keep their links. Best for video and quiz courses.', 'lmsable-migrator-for-learndash' ),
+				),
+				'source' => array(
+					'title' => __( 'Content for AI rebuild (source material)', 'lmsable-migrator-for-learndash' ),
+					'desc'  => __( 'Plain text of the course; LMSable AI builds a new course from it (requires the Pro plan in LMSable). Best for text courses.', 'lmsable-migrator-for-learndash' ),
+				),
+			);
+
 			echo '<h2>' . esc_html__( 'Export', 'lmsable-migrator-for-learndash' ) . '</h2>';
+			echo '<fieldset><legend><strong>' . esc_html__( 'Export mode', 'lmsable-migrator-for-learndash' ) . '</strong></legend>';
+			foreach ( $modes as $key => $info ) {
+				echo '<label style="display:block;max-width:640px;margin:8px 0;padding:12px;border:1px solid #c3c4c7;background:#fff">';
+				echo '<input type="radio" name="lmfl_mode" value="' . esc_attr( $key ) . '"' . checked( $mode, $key, false ) . ' /> ';
+				echo '<strong>' . esc_html( $info['title'] ) . '</strong>';
+				if ( $mode === $key ) {
+					echo ' <em>' . esc_html__( 'Recommended for this course', 'lmsable-migrator-for-learndash' ) . '</em>';
+				}
+				echo '<br /><span class="description">' . esc_html( $info['desc'] ) . '</span>';
+				echo '</label>';
+			}
+			echo '</fieldset>';
+
 			echo '<form method="post" action="' . esc_url( self::page_url() ) . '">';
 			wp_nonce_field( 'lmfl_download', 'lmfl_download_nonce' );
 			echo '<input type="hidden" name="course_id" value="' . esc_attr( (string) absint( $course_id ) ) . '" />';
+
+			echo '<div id="lmfl-mode-source"' . ( 'source' === $mode ? '' : ' hidden' ) . '>';
+			echo '<p>';
+			if ( $source_parts > 1 ) {
+				/* translators: 1: character count, 2: limit, 3: number of parts. */
+				echo esc_html( sprintf( __( 'Source material: %1$s characters — exceeds the %2$s limit, the download splits it into %3$d parts.', 'lmsable-migrator-for-learndash' ), number_format_i18n( $source_len ), number_format_i18n( LMFL_Source_Export::SOURCE_LIMIT ), $source_parts ) );
+			} else {
+				/* translators: 1: character count, 2: limit. */
+				echo esc_html( sprintf( __( 'Source material: %1$s characters — fits the %2$s limit.', 'lmsable-migrator-for-learndash' ), number_format_i18n( $source_len ), number_format_i18n( LMFL_Source_Export::SOURCE_LIMIT ) ) );
+			}
+			echo '</p>';
+			echo '<button type="submit" class="button button-primary" name="lmfl_download" value="source">';
+			echo ( $source_parts > 1 && class_exists( 'ZipArchive' ) )
+				? esc_html__( 'Download source material (.zip)', 'lmsable-migrator-for-learndash' )
+				: esc_html__( 'Download source material (.md)', 'lmsable-migrator-for-learndash' );
+			echo '</button>';
+			echo '</div>';
+
+			echo '<div id="lmfl-mode-toc"' . ( 'toc' === $mode ? '' : ' hidden' ) . '>';
 			echo '<button type="submit" class="button button-primary" name="lmfl_download" value="toc">' . esc_html__( 'Download TOC JSON', 'lmsable-migrator-for-learndash' ) . '</button> ';
 			echo '<button type="submit" class="button" name="lmfl_download" value="report">' . esc_html__( 'Download migration report', 'lmsable-migrator-for-learndash' ) . '</button> ';
 			if ( class_exists( 'ZipArchive' ) ) {
@@ -319,11 +372,12 @@ class LMFL_Admin_Page {
 			} else {
 				echo '<button type="submit" class="button" name="lmfl_download" value="content">' . esc_html__( 'Download content JSON', 'lmsable-migrator-for-learndash' ) . '</button>';
 			}
-			echo '</form>';
 
 			echo '<p><label for="lmfl-toc-json"><strong>' . esc_html__( 'TOC JSON', 'lmsable-migrator-for-learndash' ) . '</strong></label></p>';
 			echo '<textarea id="lmfl-toc-json" class="large-text code" rows="12" readonly>' . esc_textarea( $data['json'] ) . '</textarea>';
 			echo '<p><button type="button" class="button" id="lmfl-copy" data-copied="' . esc_attr__( 'Copied.', 'lmsable-migrator-for-learndash' ) . '">' . esc_html__( 'Copy JSON to clipboard', 'lmsable-migrator-for-learndash' ) . '</button> <span id="lmfl-copy-status" aria-live="polite"></span></p>';
+			echo '</div>';
+			echo '</form>';
 		}
 
 		echo '<h2>' . esc_html__( 'Requires manual migration', 'lmsable-migrator-for-learndash' ) . '</h2>';

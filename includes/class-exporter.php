@@ -113,10 +113,13 @@ class LMFL_Exporter {
 	 * Download body, file name and content type.
 	 *
 	 * @param array  $data Build data.
-	 * @param string $kind toc|report|content|package.
+	 * @param string $kind toc|report|content|package|source.
 	 * @return array{body:string,filename:string,type:string}|null Null when the file cannot be built.
 	 */
 	public function export_file( array $data, $kind ) {
+		if ( 'source' === $kind ) {
+			return $this->source_file( $data );
+		}
 		if ( 'report' === $kind ) {
 			return array(
 				'body'     => $data['report'],
@@ -145,12 +148,21 @@ class LMFL_Exporter {
 			);
 		}
 
+		$source       = new LMFL_Source_Export();
+		$source_files = $source->files( $data, $source->parts( $data ) );
+
 		$zip = $package->zip(
-			array(
-				$data['slug'] . '-toc.json'     => $data['json'],
-				$data['slug'] . '-content.json' => $content,
-				$data['slug'] . '-report.md'    => $data['report'],
-				'INSTRUCTIONS.md'               => $package->instructions( $data ),
+			array_merge(
+				array(
+					$data['slug'] . '-toc.json'     => $data['json'],
+					$data['slug'] . '-content.json' => $content,
+					$data['slug'] . '-report.md'    => $data['report'],
+					'INSTRUCTIONS.md'               => $package->instructions( $data ),
+				),
+				$source_files,
+				array(
+					'INSTRUCTIONS-source.md' => $source->instructions( $data, array_keys( $source_files ) ),
+				)
 			)
 		);
 		if ( false === $zip ) {
@@ -164,10 +176,54 @@ class LMFL_Exporter {
 	}
 
 	/**
+	 * Source material download: one .md, or a ZIP of parts when it exceeds the limit
+	 * (one .md with part markers when ZipArchive is missing).
+	 *
+	 * @param array $data Build data.
+	 * @return array{body:string,filename:string,type:string}|null
+	 */
+	private function source_file( array $data ) {
+		$source = new LMFL_Source_Export();
+		$parts  = $source->parts( $data );
+		$total  = count( $parts );
+
+		if ( 1 === $total ) {
+			return array(
+				'body'     => $parts[0],
+				'filename' => $data['slug'] . '-source.md',
+				'type'     => 'text/markdown; charset=utf-8',
+			);
+		}
+
+		if ( ! class_exists( 'ZipArchive' ) ) {
+			$body = array();
+			foreach ( $parts as $i => $part ) {
+				$body[] = '<!-- PART ' . ( $i + 1 ) . '/' . $total . ' -->' . "\n" . $part;
+			}
+			return array(
+				'body'     => implode( "\n", $body ),
+				'filename' => $data['slug'] . '-source.md',
+				'type'     => 'text/markdown; charset=utf-8',
+			);
+		}
+
+		$package = new LMFL_Content_Package();
+		$zip     = $package->zip( $source->files( $data, $parts ) );
+		if ( false === $zip ) {
+			return null;
+		}
+		return array(
+			'body'     => $zip,
+			'filename' => $data['slug'] . '-source-parts.zip',
+			'type'     => 'application/zip',
+		);
+	}
+
+	/**
 	 * Sends a download and exits.
 	 *
 	 * @param int    $course_id Course id.
-	 * @param string $kind      toc|report|content|package.
+	 * @param string $kind      toc|report|content|package|source.
 	 */
 	public function send_download( $course_id, $kind ) {
 		$file = $this->export_file( $this->build( $course_id ), $kind );
